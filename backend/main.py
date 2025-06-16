@@ -214,6 +214,14 @@ async def sketch(description: dict):
     except Exception as e:
         print(f"Error processing sketch: {e}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+    
+
+@app.get("/health", summary="Check the health of the backend service")
+async def health_check():
+    """
+    Simple health check endpoint to verify the backend service is running.
+    """
+    return {"status": "ok", "message": "Backend service is running."}
 
 
 if __name__ == "__main__":
