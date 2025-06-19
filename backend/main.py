@@ -1,5 +1,5 @@
 # main.py (FastAPI Application)
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, Body
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import uvicorn
@@ -9,8 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 # Import your agentic modules
 from ppt_generator import generate_presentation_pptx
 from agent_logic import get_slide_content_from_description, get_edited_content_from_agent, PresentationContent, SlideContent,get_mermaid_output_from_description
+import base64
 
+from google import genai
+from google.genai import types
+import base64
 
+client = genai.Client()
 
 
 
@@ -122,7 +127,7 @@ async def edit_ppt(request: EditPptRequest):
     and then the PPTX is regenerated.
     """
     try:
-        print(request)
+        
         if request.presentation_id not in presentations_store:
             raise HTTPException(status_code=404, detail="Presentation not found. Please create one first.")
 
@@ -139,7 +144,7 @@ async def edit_ppt(request: EditPptRequest):
             edit_instruction=request.edit_instruction,
             current_element_content=request.current_content
         )
-        print("Agent edit complete.")
+        
 
         # Update the in-memory structured content with the agent's edits for the specific slide.
         # It's crucial that `get_edited_content_from_agent` returns a complete `SlideContent` object.
@@ -198,14 +203,14 @@ async def download_ppt(presentation_id: str):
 
 
 #create a /sketch endpoint to test the agentic logic
-@app.post("/sketch", summary="Test the agentic logic with a sketch description")
+@app.post("/sketch", summary="Create a sketch based on a description")
 async def sketch(description: dict):
 
     """
     Endpoint to test the agentic logic with a sketch description.
     This is a placeholder for future agentic features.
     """
-    print(f"Received sketch description: {description}")
+    
     try:
         # Here you would implement the logic to process the sketch description
         # For now, we just return a mock response
@@ -214,14 +219,64 @@ async def sketch(description: dict):
     except Exception as e:
         print(f"Error processing sketch: {e}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
-    
 
-@app.get("/health", summary="Check the health of the backend service")
-async def health_check():
+
+@app.post("/generate", summary="Generate an image using AI")
+async def generate_image(data: dict = Body(...)):
     """
-    Simple health check endpoint to verify the backend service is running.
+    Generate an image from a description using Google GenAI and return it as base64.
+    Expects: { "description": "your prompt here" }
     """
-    return {"status": "ok", "message": "Backend service is running."}
+    try:
+        # print("Generating image with description:", data)
+        prompt = data.get("description")
+        slide_index = data.get("slide_index")  # Optional, default to first slide
+        presentations_id = data.get("presentation_id")  # Get the presentations store from the request
+        # print(presentations_store)
+        # current_presentation_data = presentations_store[presentations_id]['content'].slides[slide_index]
+        # current_presentation_data = presentations_store[presentations_id]
+        # curren_content = current_presentation_data['content']#.slides[slide_index]
+
+        
+        current_presentation_data = presentations_store[presentations_id]
+        current_content: PresentationContent = current_presentation_data["content"]
+        
+        if not prompt:
+            raise HTTPException(status_code=400, detail="Missing 'description' in request.")
+
+        # Initialize Google GenAI (make sure your API key is set in the environment)
+        response = client.models.generate_content(
+                    model="gemini-2.0-flash-preview-image-generation",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                    response_modalities=['TEXT', 'IMAGE']
+                    )
+                )
+
+        for part in response.candidates[0].content.parts:
+            if part.text is not None:
+                pass
+            elif part.inline_data is not None:
+                img_base64 = base64.b64encode(part.inline_data.data).decode("utf-8")
+                current_content.slides[slide_index].image_base64 = img_base64
+                
+                #current_content.slides[request.slide_index] = updated_slide
+                # current_content.slides[slide_index] = curren_slide_content
+                # print(current_presentation_data)
+                pptx_buffer = io.BytesIO()
+                generate_presentation_pptx(current_content, pptx_buffer)
+                pptx_buffer.seek(0)
+                presentations_store[presentations_id]["raw_pptx_data"] = pptx_buffer.getvalue()
+                return {"base64": img_base64}
+
+        # The SDK returns a response with a list of generated images (as bytes)
+        # We'll take the first image and encode it as base64
+        if not response or not hasattr(response, "images") or not response.images:
+            raise HTTPException(status_code=500, detail="No image generated.")
+        
+    except Exception as e:
+        print(f"Error generating image: {e}")
+        raise HTTPException(status_code=500, detail=f"Image generation failed: {str(e)}")
 
 
 if __name__ == "__main__":

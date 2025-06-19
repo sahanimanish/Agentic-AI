@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import axios from 'axios';
 
+
+
 export default function useSlideEdit({
   slides,
   setSlides,
@@ -99,6 +101,29 @@ export default function useSlideEdit({
     }
   };
 
+  // Add this function for generating image with AI
+  const handleGenerateImageWithAI = async (description, slide_index, presentationId) => {
+    try {
+      
+      
+
+      const API_BASE_URL = 'https://agentic-ai-or4s.onrender.com';
+      ; // <-- ensure this is set correctly
+
+      const response = await axios.post(`${API_BASE_URL}/generate`, {
+        description,
+        slide_index,
+        presentation_id: presentationId, // <-- add this
+      });
+      return response.data.base64;
+    } catch (err) {
+      if (showStatus && typeof showStatus === 'function') {
+        showStatus('Failed to generate image.', 'error');
+      }
+      return null;
+    }
+  };
+
   return {
     editingElement,
     setEditingElement,
@@ -110,5 +135,6 @@ export default function useSlideEdit({
     handleRefineWithAIRequest,
     handleUpdateAiInstruction,
     handleSendAiRefinement,
+    handleGenerateImageWithAI, // <-- export the new function
   };
 }

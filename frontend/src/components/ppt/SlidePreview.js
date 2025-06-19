@@ -1,17 +1,29 @@
 import React, { useState } from 'react';
 import { LayoutList, Lightbulb, Loader2, Sparkles, Save, X, Image, GripVertical } from 'lucide-react';
+import useSlideEdit from './useSlideEdit';
+import axios from 'axios';
 
 const SlidePreview = ({
   slideData, slideIndex, onSelectElementForEdit, editingElement,
   onUpdateInlineContent, onSaveInlineEdit, onCancelInlineEdit,
   onRefineWithAIRequest, onUpdateAiInstruction, onSendAiRefinement,
-  loading, onReorderBullet
+  loading, onReorderBullet,
+  slides, setSlides, presentationId, API_BASE_URL, showStatus
 }) => {
   const hasBullets = slideData.bullet_points && slideData.bullet_points.length > 0;
   const hasImage = slideData.image_description;
   const textColorPrimary = 'text-gray-800';
   const textColorSecondary = 'text-gray-700';
   const accentColor = 'border-blue-500';
+
+  // Use the hook for AI actions
+  const { handleGenerateImageWithAI } = useSlideEdit({
+    slides,
+    setSlides,
+    presentationId,
+    API_BASE_URL,
+    showStatus,
+  });
 
   const isEditingThisElement = (elementId) => {
     return editingElement && editingElement.slideIndex === slideIndex && editingElement.elementId === elementId;
@@ -21,6 +33,18 @@ const SlidePreview = ({
   const currentAiInstruction = isEditingThisElement(editingElement?.elementId) ? editingElement.aiInstruction : '';
 
   const [draggedBulletIndex, setDraggedBulletIndex] = useState(null);
+  const [generatedImgs, setGeneratedImgs] = useState({});
+  const [imgLoading, setImgLoading] = useState(false);
+
+  // Handler for Generate Image with AI
+  const handleGenerateImgClick = async (slideIndex, description,presentationId) => {
+    setImgLoading(true);
+    const base64 = await handleGenerateImageWithAI(description, slideIndex, presentationId);
+    if (base64) {
+      setGeneratedImgs(prev => ({ ...prev, [slideIndex]: base64 }));
+    }
+    setImgLoading(false);
+  };
 
   const handleBulletDragStart = (e, index) => {
     setDraggedBulletIndex(index);
@@ -57,6 +81,8 @@ const SlidePreview = ({
       el.classList.remove('border-blue-500', 'bg-blue-50');
     });
   };
+
+  
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-8 space-y-6 border border-gray-200 aspect-video flex flex-col relative overflow-hidden">
@@ -115,6 +141,7 @@ const SlidePreview = ({
               onDrop={(e) => handleBulletDrop(e, parseInt(e.target.closest('li')?.dataset.index || slideData.bullet_points.length))}
               onDragEnd={handleBulletDragEnd}
             >
+              
               {slideData.bullet_points.map((point, pointIndex) => (
                 <li
                   key={pointIndex}
@@ -174,9 +201,31 @@ const SlidePreview = ({
         )}
         {hasImage && (
           <div className={`${hasBullets ? 'w-1/2 pl-4' : 'w-full'} flex-shrink-0 flex flex-col items-center justify-center h-full`}>
-            <div className={`w-full max-w-[18rem] h-48 bg-gray-50 border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-4 text-center text-sm italic ${accentColor} text-gray-500 space-y-2`}>
-              <Image className="text-gray-400" size={40} />
-              {isEditingThisElement('image_description') ? (
+            <div
+              className={`
+                w-full
+                max-w-full
+                h-[22rem]
+                ${generatedImgs[slideIndex] ? '' : 'bg-gray-50 border-2 border-dashed'}
+                rounded-lg
+                flex flex-col items-center justify-center
+                p-4
+                text-center text-sm italic
+                ${accentColor} text-gray-500 space-y-2
+                transition-all duration-300
+              `}
+              style={{ minHeight: '18rem' }}
+            >
+              {/* Only show SVG and dotted border if image is NOT generated */}
+              {!generatedImgs[slideIndex] && <Image className="text-gray-400" size={40} />}
+              {generatedImgs[slideIndex] ? (
+                <img
+                  src={`data:image/png;base64,${generatedImgs[slideIndex]}`}
+                  alt="Generated"
+                  className="w-full h-full object-contain rounded shadow border"
+                  style={{ maxWidth: '100%', maxHeight: '100%' }}
+                />
+              ) : isEditingThisElement('image_description') ? (
                 <div className="flex flex-col w-full">
                   <div className="flex space-x-2 mb-2 self-end">
                     <button onClick={onCancelInlineEdit} className="flex items-center text-red-500 hover:text-red-700 text-sm"><X size={16} className="mr-1"/> Cancel</button>
@@ -209,13 +258,22 @@ const SlidePreview = ({
                   )}
                 </div>
               ) : (
-                <span
-                  onClick={() => onSelectElementForEdit(slideIndex, 'image_description', slideData.image_description)}
-                  className="cursor-pointer underline-offset-4 decoration-dashed decoration-blue-300 hover:text-blue-600 transition-colors duration-150 block"
-                  title="Click to edit image description"
-                >
-                  Image Suggestion: <br /> "{slideData.image_description}"
-                </span>
+                <>
+                  <span
+                    onClick={() => onSelectElementForEdit(slideIndex, 'image_description', slideData.image_description)}
+                    className="cursor-pointer underline-offset-4 decoration-dashed decoration-blue-300 hover:text-blue-600 transition-colors duration-150 block"
+                    title="Click to edit image description"
+                  >
+                    Image Suggestion: <br /> "{slideData.image_description || 'No image description yet'}"
+                  </span>
+                  <button
+                    className="mt-2 flex items-center py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-all duration-200 text-sm disabled:opacity-60"
+                    onClick={() => handleGenerateImgClick(slideIndex, slideData.image_description,presentationId)}
+                    disabled={imgLoading || !slideData.image_description}
+                  >
+                    {imgLoading ? <Loader2 className="animate-spin mr-2" size={16}/> : <Sparkles className="mr-2" size={16}/>} Generate Image with AI
+                  </button>
+                </>
               )}
             </div>
           </div>

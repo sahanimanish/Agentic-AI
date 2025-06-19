@@ -49,7 +49,7 @@ const PresentationViewer = ({
   return (
     <div className="flex flex-col lg:flex-row space-y-8 lg:space-y-0 lg:space-x-8">
       {/* Slide Thumbnails */}
-      <div className="lg:w-64 flex-shrink-0 bg-gray-100 rounded-xl shadow-lg p-4 flex flex-col items-center space-y-4 overflow-y-auto max-h-[600px] lg:max-h-[700px] custom-scrollbar">
+      <div className="hidden lg:flex lg:w-64 flex-shrink-0 bg-gray-100 rounded-xl shadow-lg p-4 flex-col items-center space-y-4 overflow-y-auto max-h-[600px] lg:max-h-[700px] custom-scrollbar">
         <h3 className="text-lg font-semibold text-gray-700 flex items-center mb-2">
           <LayoutList className="mr-2 text-blue-600" size={20} /> Slides Order
         </h3>
@@ -106,6 +106,7 @@ const PresentationViewer = ({
               onUpdateAiInstruction={handleUpdateAiInstruction}
               onSendAiRefinement={handleSendAiRefinement}
               loading={loading}
+              presentationId={presentationId}
             />
           </div>
         )}

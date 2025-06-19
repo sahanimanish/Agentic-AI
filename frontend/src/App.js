@@ -17,7 +17,6 @@ function App() {
   const toneOptions = ['professional', 'minimalist', 'playful', 'academic', 'dynamic'];
   const [tone, setTone] = useState(toneOptions[0]);
   const API_BASE_URL = 'https://agentic-ai-or4s.onrender.com';
-
   const showStatus = (message, type = 'info') => {
     setStatusMessage(message);
     setMessageType(type);

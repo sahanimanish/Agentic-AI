@@ -9,6 +9,7 @@ class SlideContent(BaseModel):
     title: str = Field(..., description="The main title of the slide.")
     bullet_points: List[str] = Field(default_factory=list, description="Key bullet points or paragraphs for the slide.")
     image_description: Optional[str] = Field(None, description="A brief, descriptive phrase for a relevant image to be placed on the slide. This can be used to generate or find an image.")
+    image_base64: Optional[str] = Field(None, description="Base64 encoded string of an image to be placed on the slide. If provided, this will override the image_description for direct image insertion.")
     # Future additions could include:
     # layout_type: Optional[str] = Field(None, description="Suggested layout type for the slide (e.g., 'title_only', 'title_and_content', 'two_column').")
     # slide_notes: Optional[str] = Field(None, description="Speaker notes for the slide.")
@@ -26,7 +27,7 @@ class MermaidOutput(BaseModel):
     """
     Represents the mermaid syntax
     """
-    elements: str = Field(..., description="Mermaid syntax representing the Excalidraw components and workflows")
+    elements: str = Field(..., description="Mermaid syntax representing the workflows")
     explanation: Optional[str] = Field(
         None, description="Explanation of the generated mermaid syntax"
     )

@@ -6,6 +6,10 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.dml import MSO_LINE
 from models.model import PresentationContent
 import io
+import os
+import base64
+import tempfile
+
 
 def generate_presentation_pptx(content: PresentationContent, output_buffer: io.BytesIO):
     """
@@ -65,6 +69,7 @@ def generate_presentation_pptx(content: PresentationContent, output_buffer: io.B
         # --- Determine Layout based on content presence ---
         has_bullets = bool(slide_data.bullet_points)
         has_image = bool(slide_data.image_description)
+        has_image_base64 = hasattr(slide_data, "image_base64") and bool(slide_data.image_base64)
 
         # Initial content area for text/bullets
         text_top = top_margin + Inches(1.2)
@@ -89,30 +94,51 @@ def generate_presentation_pptx(content: PresentationContent, output_buffer: io.B
                 image_top = text_top + (text_height - image_placeholder_height) / 2 # Centered below title
 
 
-            # Add image placeholder (enhanced for modern look)
-            img_shape = slide.shapes.add_shape(
-                MSO_SHAPE.RECTANGLE,
-                image_left,
-                image_top,
-                image_placeholder_width,
-                image_placeholder_height
-            )
-            img_shape.fill.background() # No solid fill
-            img_shape.line.color.rgb = accent_color # Use accent color for border
-            img_shape.line.width = Pt(2) # Thicker line
-            # img_shape.line.dash_style =P #pptx.enum.shapes.MsoLineDashStyle.DASH # Dashed line
-            img_shape.line.dash_style = MSO_LINE.DASH_DOT_DOT
+            
+            if has_image_base64:
+                # Decode base64 and save to temp file
+                
 
-            # Add text description over the placeholder
-            text_box_img = img_shape.text_frame
-            text_box_img.word_wrap = True
-            text_box_img.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
-            text_box_img.vertical_anchor = MSO_ANCHOR.MIDDLE
-            p_img = text_box_img.paragraphs[0]
-            p_img.text = f"Image Suggestion:\n'{slide_data.image_description}'"
-            p_img.font.size = Pt(10)
-            p_img.font.color.rgb = text_color_secondary
-            p_img.alignment = PP_ALIGN.CENTER
+                img_bytes = base64.b64decode(slide_data.image_base64)
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_img:
+                    tmp_img.write(img_bytes)
+                    tmp_img_path = tmp_img.name
+
+                # Add image to slide
+                slide.shapes.add_picture(
+                    tmp_img_path,
+                    image_left,
+                    image_top,
+                    width=image_placeholder_width,
+                    height=image_placeholder_height
+                )
+                os.remove(tmp_img_path)  # Clean up temp file
+            else:
+            
+                # Add image placeholder (enhanced for modern look)
+                img_shape = slide.shapes.add_shape(
+                    MSO_SHAPE.RECTANGLE,
+                    image_left,
+                    image_top,
+                    image_placeholder_width,
+                    image_placeholder_height
+                )
+                img_shape.fill.background() # No solid fill
+                img_shape.line.color.rgb = accent_color # Use accent color for border
+                img_shape.line.width = Pt(2) # Thicker line
+                # img_shape.line.dash_style =P #pptx.enum.shapes.MsoLineDashStyle.DASH # Dashed line
+                img_shape.line.dash_style = MSO_LINE.DASH_DOT_DOT
+
+                # Add text description over the placeholder
+                text_box_img = img_shape.text_frame
+                text_box_img.word_wrap = True
+                text_box_img.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
+                text_box_img.vertical_anchor = MSO_ANCHOR.MIDDLE
+                p_img = text_box_img.paragraphs[0]
+                p_img.text = f"Image Suggestion:\n'{slide_data.image_description}'"
+                p_img.font.size = Pt(10)
+                p_img.font.color.rgb = text_color_secondary
+                p_img.alignment = PP_ALIGN.CENTER
 
         # --- Add Bullet Points (Modern Styling) ---
         if has_bullets:
